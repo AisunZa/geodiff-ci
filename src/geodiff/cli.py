@@ -65,6 +65,17 @@ def compare(
         ),
         min=0,
     ),
+    min_bbox_coverage: float = typer.Option(
+        0.0,
+        "--min-bbox-coverage",
+        help=(
+            "Minimum required percentage "
+            "of the baseline bounding box "
+            "covered by the candidate."
+        ),
+        min=0.0,
+        max=100.0,
+    ),
     json_output: str | None = typer.Option(
         None,
         "--json-output",
@@ -89,6 +100,9 @@ def compare(
             ),
             max_invalid_increase=(
                 max_invalid_increase
+            ),
+            min_bbox_coverage=(
+                min_bbox_coverage
             ),
         )
 

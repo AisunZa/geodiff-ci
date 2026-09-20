@@ -2,6 +2,10 @@ from pathlib import Path
 
 import geopandas as gpd
 
+from geodiff.spatial import (
+    compare_spatial_extent,
+)
+
 
 def load_geodata(path: str):
     """Load a supported geospatial dataset."""
@@ -16,7 +20,9 @@ def load_geodata(path: str):
     suffix = file_path.suffix.lower()
 
     if suffix == ".parquet":
-        return gpd.read_parquet(file_path)
+        return gpd.read_parquet(
+            file_path
+        )
 
     if suffix in {
         ".geojson",
@@ -24,7 +30,9 @@ def load_geodata(path: str):
         ".gpkg",
         ".shp",
     }:
-        return gpd.read_file(file_path)
+        return gpd.read_file(
+            file_path
+        )
 
     raise ValueError(
         f"Unsupported file format: {suffix}"
@@ -38,20 +46,28 @@ def compare_feature_count(
 ):
     """Compare feature counts with an allowed loss percentage."""
 
-    baseline_count = len(baseline)
-    candidate_count = len(candidate)
+    baseline_count = len(
+        baseline
+    )
+
+    candidate_count = len(
+        candidate
+    )
 
     difference = (
-        candidate_count - baseline_count
+        candidate_count
+        - baseline_count
     )
 
     features_lost = max(
-        baseline_count - candidate_count,
+        baseline_count
+        - candidate_count,
         0,
     )
 
     if baseline_count == 0:
         loss_percent = 0.0
+
     else:
         loss_percent = (
             features_lost
@@ -104,7 +120,9 @@ def compare_schema(
     return {
         "added": added,
         "removed": removed,
-        "passed": len(removed) == 0,
+        "passed": (
+            len(removed) == 0
+        ),
     }
 
 
@@ -196,9 +214,12 @@ def compare_null_geometries(
             candidate_nulls
             - baseline_nulls
         ),
-        "allowed_increase": max_increase,
+        "allowed_increase": (
+            max_increase
+        ),
         "passed": (
-            increase <= max_increase
+            increase
+            <= max_increase
         ),
     }
 
@@ -237,9 +258,12 @@ def compare_invalid_geometries(
             candidate_invalid
             - baseline_invalid
         ),
-        "allowed_increase": max_increase,
+        "allowed_increase": (
+            max_increase
+        ),
         "passed": (
-            increase <= max_increase
+            increase
+            <= max_increase
         ),
     }
 
@@ -250,6 +274,7 @@ def compare_datasets(
     max_feature_loss: float = 0.0,
     max_null_increase: int = 0,
     max_invalid_increase: int = 0,
+    min_bbox_coverage: float = 0.0,
 ):
     """Run all GeoDiff regression checks."""
 
@@ -303,12 +328,25 @@ def compare_datasets(
                 ),
             )
         ),
+        "spatial_extent": (
+            compare_spatial_extent(
+                baseline,
+                candidate,
+                min_coverage_percent=(
+                    min_bbox_coverage
+                ),
+            )
+        ),
     }
 
     results["passed"] = all(
         check["passed"]
-        for check in results.values()
-        if isinstance(check, dict)
+        for check
+        in results.values()
+        if isinstance(
+            check,
+            dict,
+        )
         and "passed" in check
     )
 

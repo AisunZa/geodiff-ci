@@ -2,17 +2,22 @@ import json
 from pathlib import Path
 
 from rich.console import Console
-from rich.table import Table
 from rich.panel import Panel
+from rich.table import Table
 
 
 console = Console()
 
 
-def write_json_report(results, output_path: str):
+def write_json_report(
+    results,
+    output_path: str,
+):
     """Write comparison results to a JSON file."""
 
-    path = Path(output_path)
+    path = Path(
+        output_path
+    )
 
     if path.parent != Path("."):
         path.parent.mkdir(
@@ -33,20 +38,52 @@ def write_json_report(results, output_path: str):
     return path
 
 
-def status_text(passed: bool) -> str:
+def status_text(
+    passed: bool,
+) -> str:
     """Return a formatted PASS/FAIL status."""
 
     if passed:
-        return "[bold green]PASS[/bold green]"
+        return (
+            "[bold green]"
+            "PASS"
+            "[/bold green]"
+        )
 
-    return "[bold red]FAIL[/bold red]"
+    return (
+        "[bold red]"
+        "FAIL"
+        "[/bold red]"
+    )
 
 
-def render_terminal_report(results):
-    """Render a human-readable GeoDiff comparison report."""
+def format_bounds(
+    bounds,
+):
+    """Format bounding-box coordinates."""
+
+    if bounds is None:
+        return "None"
+
+    return (
+        "["
+        + ", ".join(
+            f"{value:g}"
+            for value in bounds
+        )
+        + "]"
+    )
+
+
+def render_terminal_report(
+    results,
+):
+    """Render a human-readable GeoDiff report."""
 
     table = Table(
-        title="GeoDiff Regression Report",
+        title=(
+            "GeoDiff Regression Report"
+        ),
         show_header=True,
         header_style="bold",
     )
@@ -73,14 +110,22 @@ def render_terminal_report(results):
         justify="center",
     )
 
-    feature_count = results[
-        "feature_count"
-    ]
+    feature_count = (
+        results["feature_count"]
+    )
 
     table.add_row(
         "Feature count",
-        str(feature_count["baseline"]),
-        str(feature_count["candidate"]),
+        str(
+            feature_count[
+                "baseline"
+            ]
+        ),
+        str(
+            feature_count[
+                "candidate"
+            ]
+        ),
         (
             f"Loss: "
             f"{feature_count['loss_percent']}% "
@@ -88,11 +133,15 @@ def render_terminal_report(results):
             f"{feature_count['allowed_loss_percent']}%"
         ),
         status_text(
-            feature_count["passed"]
+            feature_count[
+                "passed"
+            ]
         ),
     )
 
-    schema = results["schema"]
+    schema = results[
+        "schema"
+    ]
 
     schema_details = []
 
@@ -121,47 +170,71 @@ def render_terminal_report(results):
         "Schema",
         "-",
         "-",
-        " | ".join(schema_details),
+        " | ".join(
+            schema_details
+        ),
         status_text(
             schema["passed"]
         ),
     )
 
-    crs = results["crs"]
+    crs = results[
+        "crs"
+    ]
 
     table.add_row(
         "CRS",
-        str(crs["baseline"]),
-        str(crs["candidate"]),
-        "Coordinate reference system",
+        str(
+            crs["baseline"]
+        ),
+        str(
+            crs["candidate"]
+        ),
+        (
+            "Coordinate reference "
+            "system"
+        ),
         status_text(
             crs["passed"]
         ),
     )
 
-    geometry_types = results[
-        "geometry_types"
-    ]
+    geometry_types = (
+        results[
+            "geometry_types"
+        ]
+    )
 
     table.add_row(
         "Geometry types",
         ", ".join(
-            geometry_types["baseline"]
+            geometry_types[
+                "baseline"
+            ]
         )
         or "None",
         ", ".join(
-            geometry_types["candidate"]
+            geometry_types[
+                "candidate"
+            ]
         )
         or "None",
-        "Geometry type consistency",
+        (
+            "Geometry type "
+            "consistency"
+        ),
         status_text(
-            geometry_types["passed"]
+            geometry_types[
+                "passed"
+            ]
         ),
     )
 
-    null_geometries = results[
-        "null_geometries"
-    ]
+    null_geometries = (
+        results[
+            "null_geometries"
+        ]
+    )
 
     table.add_row(
         "Null geometries",
@@ -180,13 +253,17 @@ def render_terminal_report(results):
             f"{null_geometries['allowed_increase']}"
         ),
         status_text(
-            null_geometries["passed"]
+            null_geometries[
+                "passed"
+            ]
         ),
     )
 
-    invalid_geometries = results[
-        "invalid_geometries"
-    ]
+    invalid_geometries = (
+        results[
+            "invalid_geometries"
+        ]
+    )
 
     table.add_row(
         "Invalid geometries",
@@ -211,26 +288,69 @@ def render_terminal_report(results):
         ),
     )
 
-    console.print()
-    console.print(table)
+    spatial_extent = (
+        results[
+            "spatial_extent"
+        ]
+    )
 
-    if results["passed"]:
+    table.add_row(
+        "Spatial extent",
+        format_bounds(
+            spatial_extent[
+                "baseline"
+            ]
+        ),
+        format_bounds(
+            spatial_extent[
+                "candidate"
+            ]
+        ),
+        (
+            f"Coverage: "
+            f"{spatial_extent['coverage_percent']}% "
+            f"| Required: "
+            f"{spatial_extent['required_coverage_percent']}%"
+        ),
+        status_text(
+            spatial_extent[
+                "passed"
+            ]
+        ),
+    )
+
+    console.print()
+    console.print(
+        table
+    )
+
+    if results[
+        "passed"
+    ]:
         summary = Panel(
-            "[bold green]"
-            "PASSED — No unacceptable regressions detected."
-            "[/bold green]",
+            (
+                "[bold green]"
+                "PASSED — No unacceptable "
+                "regressions detected."
+                "[/bold green]"
+            ),
             title="Result",
             border_style="green",
         )
 
     else:
         summary = Panel(
-            "[bold red]"
-            "FAILED — One or more regressions exceeded "
-            "the configured thresholds."
-            "[/bold red]",
+            (
+                "[bold red]"
+                "FAILED — One or more "
+                "regressions exceeded the "
+                "configured thresholds."
+                "[/bold red]"
+            ),
             title="Result",
             border_style="red",
         )
 
-    console.print(summary)
+    console.print(
+        summary
+    )

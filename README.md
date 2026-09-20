@@ -9,7 +9,7 @@ Geospatial regression testing for data pipelines.
 
 GeoDiff CI compares a baseline geospatial dataset with a candidate dataset and detects potentially breaking changes before they reach production.
 
-Think of it as a lightweight regression-testing layer for spatial data: useful in ETL pipelines, data-processing workflows, and CI/CD systems where changes in geometry, schema, or feature counts need to be detected automatically.
+Think of it as a lightweight regression-testing layer for spatial data: useful in ETL pipelines, data-processing workflows, and CI/CD systems where changes in geometry, schema, feature counts, or spatial coverage need to be detected automatically.
 
 Why GeoDiff?
 
@@ -25,6 +25,7 @@ change the CRS
 introduce invalid geometries
 introduce missing geometries
 change geometry types
+reduce the geographic area covered by a dataset
 
 GeoDiff makes these changes visible and can fail a CI pipeline when configured tolerances are exceeded.
 
@@ -40,6 +41,7 @@ CRS changes
 Geometry type changes
 Missing/null geometries
 Invalid geometries
+Bounding-box / spatial extent coverage
 Configurable regression thresholds
 Machine-readable JSON reports
 CI-friendly exit codes
@@ -92,13 +94,14 @@ GeoDiff produces a regression report similar to:
 
 GeoDiff Regression Report
 
-Check                Baseline    Candidate    Details                       Status
-Feature count        2           1            Loss: 50% | Allowed: 0%       FAIL
-Schema               -           -            No column changes             PASS
-CRS                  EPSG:4326   EPSG:4326    Coordinate reference system   PASS
-Geometry types       Polygon     Polygon      Geometry type consistency     PASS
-Null geometries      0           0            Allowed increase: 0           PASS
-Invalid geometries   0           0            Allowed increase: 0           PASS
+Check                Baseline         Candidate        Details                        Status
+Feature count        2                1                Loss: 50% | Allowed: 0%        FAIL
+Schema               -                -                No column changes              PASS
+CRS                  EPSG:4326        EPSG:4326        Coordinate reference system    PASS
+Geometry types       Polygon          Polygon          Geometry type consistency      PASS
+Null geometries      0                0                Allowed increase: 0            PASS
+Invalid geometries   0                0                Allowed increase: 0            PASS
+Spatial extent       [0,0,3,3]        [0,0,1,1]        Coverage: 11.11%               PASS
 
 FAILED — One or more regressions exceeded the configured thresholds.
 Configurable thresholds
@@ -107,7 +110,7 @@ Not every dataset change should fail a pipeline.
 
 GeoDiff allows acceptable tolerances to be configured.
 
-Allow feature loss
+Feature loss
 
 Allow up to 5% feature loss:
 
@@ -120,23 +123,68 @@ This fails:
 
 geodiff compare examples/baseline.geojson examples/candidate.geojson
 
-This passes because the loss is explicitly allowed:
+This passes because the feature loss is explicitly allowed:
 
 geodiff compare examples/baseline.geojson examples/candidate.geojson \
   --max-feature-loss 50
-Allow new null geometries
+Null geometries
+
+Allow one additional missing geometry:
+
 geodiff compare baseline.geojson candidate.geojson \
-  --max-null-increase 2
-Allow new invalid geometries
+  --max-null-increase 1
+Invalid geometries
+
+Allow one additional invalid geometry:
+
 geodiff compare baseline.geojson candidate.geojson \
   --max-invalid-increase 1
+Spatial extent regression
 
-Thresholds can be combined:
+Feature counts alone do not tell you whether a dataset still covers the expected geographic area.
+
+A candidate dataset could contain a similar number of features while accidentally losing an entire geographic region.
+
+GeoDiff compares the bounding boxes of the baseline and candidate datasets and calculates how much of the baseline extent is covered by the candidate.
+
+Example:
+
+Baseline bounding box:
+[0, 0, 3, 3]
+
+Candidate bounding box:
+[0, 0, 1, 1]
+
+Coverage:
+11.11%
+
+Require at least 90% baseline bounding-box coverage:
+
+geodiff compare baseline.geojson candidate.geojson \
+  --min-bbox-coverage 90
+
+If the candidate covers less than 90% of the baseline extent, GeoDiff fails.
+
+Example:
+
+Spatial extent   [0,0,3,3]   [0,0,1,1]   Coverage: 11.11% | Required: 90%   FAIL
+
+Bounding-box enforcement is optional by default.
+
+Without --min-bbox-coverage, GeoDiff reports the spatial coverage but does not fail because of it.
+
+Combining thresholds
+
+Checks can be configured together:
 
 geodiff compare baseline.geojson candidate.geojson \
   --max-feature-loss 5 \
   --max-null-increase 1 \
-  --max-invalid-increase 0
+  --max-invalid-increase 0 \
+  --min-bbox-coverage 95
+
+This makes GeoDiff suitable for defining explicit spatial-data quality gates in CI/CD pipelines.
+
 JSON reports
 
 GeoDiff can save comparison results as JSON:
@@ -155,10 +203,27 @@ Example structure:
     "allowed_loss_percent": 0.0,
     "passed": false
   },
+  "spatial_extent": {
+    "baseline": [
+      0.0,
+      0.0,
+      3.0,
+      3.0
+    ],
+    "candidate": [
+      0.0,
+      0.0,
+      1.0,
+      1.0
+    ],
+    "coverage_percent": 11.11,
+    "required_coverage_percent": 0.0,
+    "passed": true
+  },
   "passed": false
 }
 
-This makes GeoDiff output suitable for downstream CI/CD tools and automated reporting.
+Machine-readable output allows GeoDiff results to be consumed by CI/CD tools and other automated systems.
 
 Exit codes
 
@@ -169,11 +234,11 @@ Exit code	Meaning
 1	A regression exceeded configured thresholds
 2	Input or execution error
 
-This means GeoDiff can directly act as a quality gate inside automated pipelines.
+GeoDiff can therefore act directly as a quality gate in an automated pipeline.
 
 GitHub Actions
 
-The repository tests GeoDiff automatically on:
+The repository automatically tests GeoDiff on:
 
 Python 3.11
 Python 3.12
@@ -181,16 +246,17 @@ Python 3.13
 
 The workflow runs on pushes and pull requests to main.
 
-A pipeline can also use GeoDiff itself as a validation step:
+A pipeline can use GeoDiff as a validation step:
 
-- name: Check geospatial regression
+- name: Check geospatial regressions
   run: >
     geodiff compare
     data/baseline.geojson
     data/candidate.geojson
     --max-feature-loss 2
+    --min-bbox-coverage 95
 
-If the configured tolerance is exceeded, GeoDiff exits with status 1 and the workflow fails.
+If any configured regression threshold is exceeded, GeoDiff exits with status 1 and the workflow fails.
 
 Running the tests
 
@@ -202,8 +268,18 @@ For detailed output:
 
 pytest -v
 
-The test suite covers feature-count regressions, schema changes, CRS changes, geometry-type changes, invalid and missing geometries, and configurable thresholds.
+The test suite covers:
 
+feature-count regressions
+feature-loss thresholds
+schema changes
+CRS changes
+geometry-type changes
+invalid geometries
+missing geometries
+spatial extent regression
+bounding-box coverage thresholds
+JSON report generation
 Project structure
 geodiff-ci/
 ├── .github/
@@ -217,10 +293,12 @@ geodiff-ci/
 │       ├── __init__.py
 │       ├── cli.py
 │       ├── compare.py
-│       └── report.py
+│       ├── report.py
+│       └── spatial.py
 ├── tests/
 │   ├── test_compare.py
-│   └── test_report.py
+│   ├── test_report.py
+│   └── test_spatial.py
 ├── .gitignore
 ├── LICENSE
 ├── pyproject.toml
@@ -233,18 +311,19 @@ The project favors:
 
 explicit regression rules
 deterministic comparisons
+geospatial-aware quality checks
+configurable tolerances
 useful CI exit codes
 testable comparison functions
 machine-readable output
 minimal infrastructure requirements
 
-It is designed as a developer tool rather than a dashboard or geospatial visualization platform.
+It is designed as a developer tool rather than a dashboard or visualization platform.
 
 Roadmap
 
 Potential future checks include:
 
-Bounding-box / spatial extent regression
 Duplicate feature ID detection
 Geometry area and length drift
 Attribute type changes
