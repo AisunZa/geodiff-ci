@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "geodiff-ci"
+version = "0.1.0"
+description = "Geospatial regression testing for data pipelines."
+readme = "README.md"
+requires-python = ">=3.11"
+
+dependencies = [
+    "geopandas",
+    "shapely",
+    "pyarrow",
+    "typer",
+    "rich",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+]
+
+[project.scripts]
+geodiff = "geodiff.cli:app"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

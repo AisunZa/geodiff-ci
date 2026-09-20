@@ -1,0 +1,55 @@
+name: GeoDiff CI
+
+on:
+  push:
+    branches:
+      - main
+
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Python ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version:
+          - "3.11"
+          - "3.12"
+          - "3.13"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Upgrade pip
+        run: python -m pip install --upgrade pip
+
+      - name: Install GeoDiff and test dependencies
+        run: python -m pip install -e ".[dev]"
+
+      - name: Run test suite
+        run: pytest -v
+
+      - name: Test CLI version command
+        run: geodiff version
+
+      - name: Test successful dataset comparison
+        run: >
+          geodiff compare
+          examples/baseline.geojson
+          examples/candidate.geojson
+          --max-feature-loss 50
