@@ -6,7 +6,7 @@
 
 GeoDiff CI is a Python command-line tool that compares a **baseline** geospatial dataset with a **candidate** dataset to detect changes that could break a data-processing workflow. It checks feature counts, schema, coordinate reference systems (CRS), geometry quality, and spatial extent, and returns exit codes suitable for CI pipelines.
 
-**Start here:** [Quick start](#quick-start) · [Checks](#what-geodiff-checks) · [Thresholds](#configurable-thresholds) · [GitHub Actions](#github-actions) · [Development](#development)
+**Start here:** [Quick start](#quick-start) · [Checks](#what-geodiff-checks) · [Thresholds](#configurable-thresholds) · [GitHub Actions](#github-actions) · [Development](#development) · [Changelog](CHANGELOG.md)
 
 ## Why GeoDiff?
 
