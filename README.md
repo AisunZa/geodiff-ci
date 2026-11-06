@@ -1,97 +1,86 @@
-GeoDiff CI
+# GeoDiff CI
 
+[![CI](https://github.com/AisunZa/geodiff-ci/actions/workflows/ci.yml/badge.svg)](https://github.com/AisunZa/geodiff-ci/actions/workflows/ci.yml)
 
+**Geospatial regression testing for data pipelines.**
 
+GeoDiff CI is a Python command-line tool that compares a **baseline** geospatial dataset with a **candidate** dataset to detect changes that could break a data-processing workflow. It checks feature counts, schema, coordinate reference systems (CRS), geometry quality, and spatial extent, and returns exit codes suitable for CI pipelines.
 
+**Start here:** [Quick start](#quick-start) · [Checks](#what-geodiff-checks) · [Thresholds](#configurable-thresholds) · [GitHub Actions](#github-actions) · [Development](#development)
 
+## Why GeoDiff?
 
-Geospatial regression testing for data pipelines.
+Traditional software projects use tests to detect code regressions. Geospatial pipelines also need checks for **data regressions**. A processing change can unexpectedly remove features or columns, alter the CRS, introduce invalid or missing geometries, change geometry types, or reduce geographic coverage.
 
-GeoDiff CI compares a baseline geospatial dataset with a candidate dataset and detects potentially breaking changes before they reach production.
+GeoDiff makes these changes visible and can fail a pipeline when a configured threshold is exceeded.
 
-Think of it as a lightweight regression-testing layer for spatial data: useful in ETL pipelines, data-processing workflows, and CI/CD systems where changes in geometry, schema, feature counts, or spatial coverage need to be detected automatically.
+## Quick start
 
-Why GeoDiff?
+Requires **Python 3.11+**.
 
-Traditional software projects have unit tests to detect regressions in code.
-
-Geospatial pipelines also need regression checks for their data.
-
-A processing change can unexpectedly:
-
-remove features
-drop columns
-change the CRS
-introduce invalid geometries
-introduce missing geometries
-change geometry types
-reduce the geographic area covered by a dataset
-
-GeoDiff makes these changes visible and can fail a CI pipeline when configured tolerances are exceeded.
-
-Features
-
-GeoDiff currently checks:
-
-Feature count changes
-Feature-loss percentage
-Schema changes
-Removed and added columns
-CRS changes
-Geometry type changes
-Missing/null geometries
-Invalid geometries
-Bounding-box / spatial extent coverage
-Configurable regression thresholds
-Machine-readable JSON reports
-CI-friendly exit codes
-Colored terminal reports
-Supported formats
-
-GeoDiff can currently load:
-
-GeoJSON
-GeoParquet
-GeoPackage
-ESRI Shapefile
-JSON datasets supported by GeoPandas
-Installation
-
-Clone the repository:
-
+```bash
 git clone https://github.com/AisunZa/geodiff-ci.git
 cd geodiff-ci
-
-Create a virtual environment:
-
 python -m venv .venv
+```
 
-Activate it.
+Activate the virtual environment:
 
-Windows PowerShell
-.venv\Scripts\Activate.ps1
-Linux / macOS
+**Linux / macOS**
+
+```bash
 source .venv/bin/activate
+```
 
-Install GeoDiff:
+**Windows PowerShell**
 
+```powershell
+.venv\Scripts\Activate.ps1
+```
+
+Install the package and run the included comparison example:
+
+```bash
 python -m pip install -e .
-
-For development and testing:
-
-python -m pip install -e ".[dev]"
-Quick start
-
-Compare two geospatial datasets:
-
-geodiff compare baseline.geojson candidate.geojson
-
-Example:
-
 geodiff compare examples/baseline.geojson examples/candidate.geojson
+```
 
-GeoDiff produces a regression report similar to:
+The example deliberately contains fewer features in the candidate dataset, so **a failure report and exit code `1` are expected** with default thresholds. To allow the example's 50% feature loss:
 
+```bash
+geodiff compare examples/baseline.geojson examples/candidate.geojson --max-feature-loss 50
+```
+
+> **Note:** This is a local-install workflow. The repository does not claim that `geodiff-ci` is published to PyPI.
+
+## What GeoDiff checks
+
+| Check | What it detects |
+|---|---|
+| Feature count | Added or removed features |
+| Feature-loss percentage | Loss exceeding the allowed percentage |
+| Schema | Added or removed columns |
+| CRS | Coordinate reference system changes |
+| Geometry type | Changes in geometry types |
+| Null geometries | Increase in missing geometries |
+| Invalid geometries | Increase in invalid shapes |
+| Spatial extent | Baseline bounding-box coverage by the candidate |
+
+**Other capabilities:** configurable thresholds, terminal reports, machine-readable JSON output, and CI-friendly exit codes.
+
+### Supported input formats
+
+- GeoJSON
+- GeoParquet
+- GeoPackage
+- ESRI Shapefile
+- Other JSON datasets supported by GeoPandas
+
+## Example regression report
+
+Comparing the included sample files without changing the default thresholds produces a report similar to:
+
+```text
 GeoDiff Regression Report
 
 Check                Baseline         Candidate        Details                        Status
@@ -104,96 +93,78 @@ Invalid geometries   0                0                Allowed increase: 0      
 Spatial extent       [0,0,3,3]        [0,0,1,1]        Coverage: 11.11%               PASS
 
 FAILED — One or more regressions exceeded the configured thresholds.
-Configurable thresholds
+```
 
-Not every dataset change should fail a pipeline.
+## Configurable thresholds
 
-GeoDiff allows acceptable tolerances to be configured.
+Not every dataset change should fail a pipeline. GeoDiff lets you define acceptable tolerances.
 
-Feature loss
+### Feature loss
 
 Allow up to 5% feature loss:
 
+```bash
+geodiff compare baseline.geojson candidate.geojson --max-feature-loss 5
+```
+
+The included sample candidate has 50% fewer features than its baseline. It fails with the defaults, but passes the **feature-loss check** when that amount is explicitly allowed:
+
+```bash
+geodiff compare examples/baseline.geojson examples/candidate.geojson --max-feature-loss 50
+```
+
+### Null and invalid geometries
+
+Allow one additional missing geometry or one additional invalid geometry:
+
+```bash
 geodiff compare baseline.geojson candidate.geojson \
-  --max-feature-loss 5
-
-For example, the sample candidate contains 50% fewer features than the baseline.
-
-This fails:
-
-geodiff compare examples/baseline.geojson examples/candidate.geojson
-
-This passes because the feature loss is explicitly allowed:
-
-geodiff compare examples/baseline.geojson examples/candidate.geojson \
-  --max-feature-loss 50
-Null geometries
-
-Allow one additional missing geometry:
-
-geodiff compare baseline.geojson candidate.geojson \
-  --max-null-increase 1
-Invalid geometries
-
-Allow one additional invalid geometry:
-
-geodiff compare baseline.geojson candidate.geojson \
+  --max-null-increase 1 \
   --max-invalid-increase 1
-Spatial extent regression
+```
 
-Feature counts alone do not tell you whether a dataset still covers the expected geographic area.
+### Spatial extent regression
 
-A candidate dataset could contain a similar number of features while accidentally losing an entire geographic region.
+Feature counts alone do not establish that a dataset covers the expected geographic area. GeoDiff compares the **bounding boxes** of the baseline and candidate datasets.
 
-GeoDiff compares the bounding boxes of the baseline and candidate datasets and calculates how much of the baseline extent is covered by the candidate.
+For example:
 
-Example:
+```text
+Baseline bounding box:  [0, 0, 3, 3]
+Candidate bounding box: [0, 0, 1, 1]
+Coverage: 11.11%
+```
 
-Baseline bounding box:
-[0, 0, 3, 3]
+Require at least 90% coverage of the baseline bounding box:
 
-Candidate bounding box:
-[0, 0, 1, 1]
+```bash
+geodiff compare baseline.geojson candidate.geojson --min-bbox-coverage 90
+```
 
-Coverage:
-11.11%
+> **Important:** Bounding-box overlap is an approximation of geographic extent, not an exact comparison of the geometries' covered areas. Enforcement is **off by default**; without `--min-bbox-coverage`, GeoDiff reports coverage but does not fail specifically because of it.
 
-Require at least 90% baseline bounding-box coverage:
+### Combine thresholds
 
-geodiff compare baseline.geojson candidate.geojson \
-  --min-bbox-coverage 90
-
-If the candidate covers less than 90% of the baseline extent, GeoDiff fails.
-
-Example:
-
-Spatial extent   [0,0,3,3]   [0,0,1,1]   Coverage: 11.11% | Required: 90%   FAIL
-
-Bounding-box enforcement is optional by default.
-
-Without --min-bbox-coverage, GeoDiff reports the spatial coverage but does not fail because of it.
-
-Combining thresholds
-
-Checks can be configured together:
-
+```bash
 geodiff compare baseline.geojson candidate.geojson \
   --max-feature-loss 5 \
   --max-null-increase 1 \
   --max-invalid-increase 0 \
   --min-bbox-coverage 95
+```
 
-This makes GeoDiff suitable for defining explicit spatial-data quality gates in CI/CD pipelines.
+## JSON reports
 
-JSON reports
+Save a comparison as machine-readable JSON:
 
-GeoDiff can save comparison results as JSON:
-
+```bash
 geodiff compare baseline.geojson candidate.geojson \
   --json-output reports/result.json
+```
 
-Example structure:
+An example of the report structure is:
 
+```json
 {
   "feature_count": {
     "baseline": 2,
@@ -204,49 +175,37 @@ Example structure:
     "passed": false
   },
   "spatial_extent": {
-    "baseline": [
-      0.0,
-      0.0,
-      3.0,
-      3.0
-    ],
-    "candidate": [
-      0.0,
-      0.0,
-      1.0,
-      1.0
-    ],
+    "baseline": [0.0, 0.0, 3.0, 3.0],
+    "candidate": [0.0, 0.0, 1.0, 1.0],
     "coverage_percent": 11.11,
     "required_coverage_percent": 0.0,
     "passed": true
   },
   "passed": false
 }
+```
 
-Machine-readable output allows GeoDiff results to be consumed by CI/CD tools and other automated systems.
+This is a **simplified example** showing selected fields, not necessarily the complete output of every check.
 
-Exit codes
+### Exit codes
 
-GeoDiff uses CI-friendly process exit codes:
+| Code | Meaning |
+|---|---|
+| `0` | Comparison passed |
+| `1` | A regression exceeded configured thresholds |
+| `2` | Input or execution error |
 
-Exit code	Meaning
-0	Comparison passed
-1	A regression exceeded configured thresholds
-2	Input or execution error
+These codes allow CI jobs to pass or fail based on spatial-data quality checks.
 
-GeoDiff can therefore act directly as a quality gate in an automated pipeline.
+## GitHub Actions
 
-GitHub Actions
+This repository's [CI workflow](.github/workflows/ci.yml) runs tests on **Python 3.11, 3.12, and 3.13**, on pushes and pull requests targeting `main`.
 
-The repository automatically tests GeoDiff on:
+To use GeoDiff in another GitHub Actions job, install it first, then run a comparison. For example, after checking out the relevant repository and making the datasets available:
 
-Python 3.11
-Python 3.12
-Python 3.13
-
-The workflow runs on pushes and pull requests to main.
-
-A pipeline can use GeoDiff as a validation step:
+```yaml
+- name: Install GeoDiff
+  run: python -m pip install -e .
 
 - name: Check geospatial regressions
   run: >
@@ -255,92 +214,74 @@ A pipeline can use GeoDiff as a validation step:
     data/candidate.geojson
     --max-feature-loss 2
     --min-bbox-coverage 95
+```
 
-If any configured regression threshold is exceeded, GeoDiff exits with status 1 and the workflow fails.
+> The example assumes the job is running inside a checkout containing the GeoDiff package. If your workflow is in another repository, install GeoDiff from its GitHub source or another supported distribution mechanism, and adjust the dataset paths.
 
-Running the tests
+## Development
 
-Run:
+Install development dependencies:
 
-pytest
+```bash
+python -m pip install -e ".[dev]"
+```
 
-For detailed output:
+Run the tests:
 
+```bash
 pytest -v
+```
 
-The test suite covers:
+The test suite covers feature counts, thresholds, schema/CRS changes, geometry types, null and invalid geometries, bounding-box coverage, and JSON reports.
 
-feature-count regressions
-feature-loss thresholds
-schema changes
-CRS changes
-geometry-type changes
-invalid geometries
-missing geometries
-spatial extent regression
-bounding-box coverage thresholds
-JSON report generation
-Project structure
+### Project structure
+
+```text
 geodiff-ci/
-├── .github/
-│   └── workflows/
-│       └── ci.yml
+├── .github/workflows/ci.yml
 ├── examples/
 │   ├── baseline.geojson
 │   └── candidate.geojson
-├── src/
-│   └── geodiff/
-│       ├── __init__.py
-│       ├── cli.py
-│       ├── compare.py
-│       ├── report.py
-│       └── spatial.py
+├── src/geodiff/
+│   ├── __init__.py
+│   ├── cli.py
+│   ├── compare.py
+│   ├── report.py
+│   └── spatial.py
 ├── tests/
-│   ├── test_compare.py
-│   ├── test_report.py
-│   └── test_spatial.py
 ├── .gitignore
 ├── LICENSE
 ├── pyproject.toml
 └── README.md
-Design principles
+```
 
-GeoDiff is intentionally small and focused.
+## Design principles
 
-The project favors:
+- Explicit regression rules and configurable tolerances
+- Deterministic comparisons and geospatial-aware checks
+- Machine-readable output and useful process exit codes
+- Testable functions with minimal infrastructure requirements
 
-explicit regression rules
-deterministic comparisons
-geospatial-aware quality checks
-configurable tolerances
-useful CI exit codes
-testable comparison functions
-machine-readable output
-minimal infrastructure requirements
+GeoDiff is intentionally a focused **developer tool**, rather than a dashboard or visualization platform.
 
-It is designed as a developer tool rather than a dashboard or visualization platform.
+## Roadmap
 
-Roadmap
+Possible future improvements include:
 
-Potential future checks include:
+- Duplicate feature ID detection
+- Geometry area and length drift
+- Attribute type and numeric distribution changes
+- Configuration-file-based thresholds
+- Markdown CI reports
+- Per-check enable/disable controls
+- Additional geospatial formats
 
-Duplicate feature ID detection
-Geometry area and length drift
-Attribute type changes
-Numeric attribute distribution changes
-Config-file based thresholds
-Markdown CI reports
-Per-check enable/disable controls
-Additional geospatial formats
-Technology
-Python
-GeoPandas
-Shapely
-PyArrow
-Typer
-Rich
-Pytest
-GitHub Actions
-License
+These are **ideas**, not features already implemented.
 
-MIT License.
+## Technology
+
+Python · GeoPandas · Shapely · PyArrow · Typer · Rich · Pytest · GitHub Actions
+
+## License
+
+MIT License. See [LICENSE](LICENSE).
