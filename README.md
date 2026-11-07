@@ -66,6 +66,29 @@ geodiff compare examples/baseline.geojson examples/candidate.geojson --max-featu
 
 > **Note:** This is a local-install workflow. The repository does not claim that `geodiff-ci` is published to PyPI.
 
+## Use GeoDiff CI in Python
+
+You can also use GeoDiff CI inside a Python script, without running a terminal command for each comparison.
+
+After installing the package, run this example from the repository root:
+
+```python
+from geodiff.compare import compare_datasets
+
+results = compare_datasets(
+    "examples/baseline.geojson",
+    "examples/candidate.geojson",
+    max_feature_loss=50,
+)
+
+print("Comparison passed:", results["passed"])
+print("Feature loss (%):", results["feature_count"]["loss_percent"])
+```
+
+The sample candidate dataset contains 50% fewer features. The example allows that loss explicitly, so the feature-loss check passes. Without the allowance, the default check would flag the missing features.
+
+The current Python functions are importable from `geodiff.compare`; a simplified, stable public API is not yet defined.
+
 ## What GeoDiff checks
 
 | Check | What it detects |
