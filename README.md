@@ -14,6 +14,19 @@ Traditional software projects use tests to detect code regressions. Geospatial p
 
 GeoDiff makes these changes visible and can fail a pipeline when a configured threshold is exceeded.
 
+## Install directly from GitHub
+
+Requires Python 3.11+ and Git. In an activated virtual environment, run:
+
+```bash
+python -m pip install "geodiff-ci @ git+https://github.com/AisunZa/geodiff-ci.git@v0.1.0"
+geodiff version
+```
+
+This installs the tagged `v0.1.0` release without manually cloning the repository. For sample datasets, testing, or development, follow the local installation instructions below.
+
+GeoDiff CI is not currently published to PyPI.
+
 ## Quick start
 
 Requires **Python 3.11+**.
